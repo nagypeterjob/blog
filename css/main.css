@@ -1,0 +1,142 @@
+.blockquote {
+    border-left: 1px solid black;
+    padding-left: 10px;
+}
+
+p {
+    font-size: 1.2em;
+}
+
+a {
+    text-decoration: none;
+}
+
+/* HEADER */
+
+.underline {
+    border-bottom: 1px solid rgb(211, 211, 211);
+}
+
+.head ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0 0 10px 0;
+    clear: both;
+    overflow: hidden;
+}
+
+.head ul li {
+    float: left;
+    line-height: 1.1em;
+	margin: 0 .5em 0 -.5em;
+	padding: 0 .5em 0 .5em;
+}
+
+.header {
+    max-width: 880px;
+}
+
+.logo {
+    font-weight: bold;
+    font-size: 1.8em;
+    padding: 10px 0 0 0;
+}
+
+.disclaimer {
+    font-size: 12px;
+    padding: 0 0 15px 0;
+}
+
+/* INDEX */
+
+.article {
+    max-width: 880px
+}
+
+.posts h2 {
+    font-size: 1.8em;
+    padding-top: 20px;
+}
+
+.posts ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0 0 10px 0;
+}
+
+.posts ul li {
+    padding: 7px 0 0 0;
+}
+
+/* POST */
+
+.post p,
+.post ul,
+.post ol,
+.post blockquote {
+    color: #374151;
+}
+
+.post h1 {
+    font-size: 2em;
+    padding-top: 20px;
+}
+
+.post h2 {
+    font-size: 1.6em;
+    padding-top: 20px;
+} 
+
+.post h3 {
+    font-size: 1.4em;
+    padding-top: 20px;
+}
+
+.post .date {
+    font-style: italic;
+    font-size: 0.8em;
+    padding: 5px 0 5px 0;
+}
+
+.post ol { 
+    counter-reset: item;
+    list-style-type: none;
+}
+.post li {
+    display: block;
+    font-size: 1.1em;
+    padding-bottom: 5px;
+}
+
+.post li:before { 
+    content: counter(item) "  "; 
+    counter-increment: item;
+}
+
+.post pre {
+    display: block;
+    white-space: pre;
+    margin: 0.5em 0px;
+}
+
+.post pre code {
+    background: #eee;
+    display: block;
+    padding-left: 2em;
+    white-space: pre-wrap;
+}
+
+.list {
+    margin-bottom: 8px;
+    margin-bottom: 1em;
+}
+
+.list div {
+    font-size: 1.1em;
+}
+
+.list .num {
+    font-weight: bold;
+    font-size: 0.8em;
+    line-height: 1.8em;
+}
