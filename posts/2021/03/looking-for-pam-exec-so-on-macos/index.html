@@ -1,0 +1,122 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Looking for pam_exec.so </title>
+  <meta name="description" content="Exploring ssh, audit logs & PAM on MacOS">
+  <meta name="author" content="Peter Nagy">
+  <meta name="roboots" content="index, archive, follow">
+
+  <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-67534623-1', 'auto');
+    ga('send', 'pageview');
+  </script>
+  <script async src='https://www.google-analytics.com/analytics.js'></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+  <link rel="stylesheet" href="../../../../css/main.css?v=1.0">
+
+</head>
+
+<body>
+    <div class="container-fluid underline head">
+      <div class="container header">
+        <div class="row">
+          <div class="col">
+            <div class="logo">
+              Peter is doing platform
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="disclaimer">
+              The opinions expressed on this blog are purely mine
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <ul>
+              <li><a href="../../../../">blog</a></li>
+              <li><a href="https://github.com/nagypeterjob">github</a></li>
+              <li><a href="https://twitter.com/ngy_ptr">twitter</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="container article">
+        <div class="row">
+            <div class="col post">
+                <h1>Looking for pam_exec.so on MacOS</h1>
+                <p class="date">2021-03-20</p>
+                <h2>PAM</h2>
+                <p>The other day I was looking for a reliable way to capture ssh session termination events on both Linux and MacOS. One method which I particularly liked and works perfectly on Linux is PAM session events. Look at the following script:</p> 
+                <pre>
+                    <code>
+// opt/event_handler.sh
+
+#!/bin/bash
+set -euo pipefail
+
+if [[ ${PAM_TYPE} == "close_session" ]]; then
+        // TODO: SOME ACTION
+fi
+                    </code>
+                </pre>
+                <p>Now add the following line to <strong>/etc/pam.d/sshd</strong>:</p>
+                <pre>
+                    <code>
+session    optional    pam_exec.so quiet /opt/event_handler.sh
+                    </code>
+                </pre>
+                <p>I was sad to realize that the above solution does not work on MacOS. Looking at <strong>sshd</strong> logs I saw these errors all over the place:</p>
+                <pre>
+                    <code>
+sshd: (libpam.2.dylib) in openpam_load_module(): no pam_exec.so found
+                    </code>
+                </pre>
+                <p>To confirm that <strong>pam_exec.so</strong> is indeed not present on my machine (Big Sur 11.2.1):</p>
+                <pre>
+                    <code>
+$ sudo ls -la /usr/lib/pam |grep pam
+-r--r--r--   1 root  wheel  139248 Jan  1  2020 pam_aks.so.2
+-rwxr-xr-x   1 root  wheel   71392 Jan  1  2020 pam_deny.so.2
+-r--r--r--   1 root  wheel  156896 Jan  1  2020 pam_env.so.2
+-r--r--r--   1 root  wheel  138192 Jan  1  2020 pam_group.so.2
+-r--r--r--   1 root  wheel  199184 Jan  1  2020 pam_krb5.so.2
+-r--r--r--   1 root  wheel  138832 Jan  1  2020 pam_launchd.so.2
+-r--r--r--   1 root  wheel  197664 Jan  1  2020 pam_localauthentication.so.2
+-r--r--r--   1 root  wheel  144816 Jan  1  2020 pam_mount.so.2
+-r--r--r--   1 root  wheel  137936 Jan  1  2020 pam_nologin.so.2
+-r--r--r--   1 root  wheel  143952 Jan  1  2020 pam_ntlm.so.2
+-r--r--r--   1 root  wheel  178624 Jan  1  2020 pam_opendirectory.so.2
+-rwxr-xr-x   1 root  wheel   71392 Jan  1  2020 pam_permit.so.2
+-r--r--r--   1 root  wheel  120688 Jan  1  2020 pam_rootok.so.2
+-r--r--r--   1 root  wheel  138112 Jan  1  2020 pam_sacl.so.2
+-r--r--r--   1 root  wheel  137488 Jan  1  2020 pam_self.so.2
+-r--r--r--   1 root  wheel  268720 Jan  1  2020 pam_smartcard.so.2
+-r--r--r--   1 root  wheel  215264 Jan  1  2020 pam_tid.so.2
+-r--r--r--   1 root  wheel  121696 Jan  1  2020 pam_uwtmp.so.2
+                    </code>
+                </pre>
+                <p>I have found no deprecation logs or any evidence if the <strong>exec</strong> module has ever worked on MacOS.</p>
+                <p>I have tried to compile <a href="https://github.com/linux-pam/linux-pam/blob/master/modules/pam_exec/pam_exec.c">this</a> file for Darwin to be able to create a Shared Object. I've set up a timebox of 1 hour to finish this experiment, but as I was unable to succeed I have abandoned the whole idea.</p>
+            <h2>openBSM / auditpipe</h2>
+            <p>After my failed experiment with PAM, I wanted to concentrate on MacOS to find an alternative solution to my problem. I have stumbled across a blog which <a href="https://meliot.me/2017/07/02/mac-os-real-time-auditing/">explores</a> openBSM and auditpipeline. It is a fascinating read and a great work, but regrettably <strong>auditpipe</strong> is deprecated on the latest MacOS versions. Without exploring further, I've abandoned this idea too, which led me to <strong>System Extensions</strong>.</p>
+            
+            <h2>System Extensions</h2>
+            <p>System Extensions are Apple's new, preferred way of fiddling with the Darwin kernel subsystem. Glancing over <strong>Endpoint Security API</strong> <a href="https://developer.apple.com/documentation/endpointsecurity/event_types">event types</a> shows some promise. Apple provides a pretty low-level API, but implementing the stuff I need shouldn't be too hard. My only concern is that the Extension distribution seems tedious and there is a signing process in place. Yuck.</p>
+            
+            <h2>Conslusion</h2>
+            <p>That is where I am at the moment. I may dive deep into System Extension in the upcoming weeks to implement a proper auditing tool for my use case. We will see, I'll keep you updated.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
