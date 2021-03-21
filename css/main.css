@@ -74,7 +74,7 @@ a {
 .post ul,
 .post ol,
 .post blockquote {
-    color: #374151;
+    color: #2f363d;
 }
 
 .post h1 {
@@ -139,4 +139,15 @@ a {
     font-weight: bold;
     font-size: 0.8em;
     line-height: 1.8em;
+}
+
+/* 404 */
+
+.not-found {
+    color: #2f363d;
+    text-align: center;
+}
+
+.not-found h1 {
+    padding: 20px 0;
 }
