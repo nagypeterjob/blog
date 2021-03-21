@@ -1,0 +1,199 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Using DynamoDb Filters and Expression Attribute Names with the aws-go-sdk</title>
+  <meta name="description" content="how to use dynamodb filters and expression attribute names with aws-go-sdk">
+  <meta name="author" content="Peter Nagy">
+  <meta name="roboots" content="index, archive, follow">
+  <meta name="googlebot" content="index, follow">
+
+  <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-67534623-1', 'auto');
+    ga('send', 'pageview');
+  </script>
+  <script async src='https://www.google-analytics.com/analytics.js'></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+  <link rel="stylesheet" href="../../../../css/main.css?v=1.0">
+  <link rel="icon" type="image/x-icon" href="../../../../icons/favicon.ico">
+  <link rel="apple-touch-icon" sizes="120x120" href="../../../../icons/apple-touch-icon-120x120.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="../../../../icons/apple-touch-icon-152x152.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="../../../../icons/apple-touch-icon-180x180.png" />
+</head>
+
+<body>
+    <div class="container-fluid underline head">
+      <div class="container header">
+        <div class="row">
+          <div class="col">
+            <div class="logo">
+              Peter is doing platform
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="disclaimer">
+              The opinions expressed on this blog are purely mine
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <ul>
+              <li><a href="../../../../">blog</a></li>
+              <li><a href="https://github.com/nagypeterjob">github</a></li>
+              <li><a href="https://twitter.com/ngy_ptr">twitter</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="container article">
+        <div class="row">
+            <div class="col post">
+                <h1>Using DynamoDb Filters and Expression Attribute Names with the aws-go-sdk</h1>
+                <p class="date">2019-01-06</p>
+                <p>
+                    aws-go-sdk documentation doesn’t say much about how to use <strong>Expression Attribute Names</strong>, or what to do, when one of your attribute names is a reserved word of DynamoDb. Let me fill the hole.
+                </p>
+                <blockquote class="blockquote">
+                  Each examples below are using the Scan API.
+                </blockquote>
+                <h2>Filter by primary partition key</h2>
+                <p>In this basic example, sensorID is the primary partition key.</p>
+                <pre>
+                  <code>
+// Declare ScanInput parameters
+// The ones without value will be nil, thus ignored by the request
+var expressionAttributeNames map[string]*string
+var expressionAttributeValues map[string]*dynamodb.AttributeValue
+var filterExpression *string
+var projectionExpression *string
+// Create an attribute value mapping, so we are able to use :id in the filter expression
+expressionAttributeValues = map[string]*dynamodb.AttributeValue{
+  ":id": {
+        S: aws.String(*SensorID),
+  },
+}
+filterExpression = aws.String("sensorID = :id")
+
+// ProjectionExpression is nil, so we receive all Item attributes in response
+params := &dynamodb.ScanInput{
+  ExpressionAttributeNames:  expressionAttributeNames,
+  ExpressionAttributeValues: expressionAttributeValues,
+  FilterExpression:          filterExpression,
+  ProjectionExpression:      projectionExpression,
+  TableName:                 aws.String(os.Getenv("TABLE_NAME")),
+}
+results, err := svc.Scan(params)
+if err != nil {
+  return Response{}, err
+}
+
+// Iterate results
+for _, i := range results.Items {
+  ...
+}
+                  </code>
+                </pre>
+                <h2>Filter by primary sort key</h2>
+                <p>In this example, which is basically identical to the previous one, <strong>venueID</strong> is the primary sort key. I just wanted to demonstrate, that the use of API and parameters is not changing compared to the previous scenario.</p>
+                <pre>
+                  <code>
+// Declare ScanInput parameters
+// The ones without value will be nil, thus ignored by the request
+var expressionAttributeNames map[string]*string
+var expressionAttributeValues map[string]*dynamodb.AttributeValue
+var filterExpression *string
+var projectionExpression *string
+
+// Create an attribute value mapping, so we are able to use :id in the filter expression
+expressionAttributeValues = map[string]*dynamodb.AttributeValue{
+  ":v": {
+        S: aws.String(*VenueID),
+  },
+}
+filterExpression = aws.String("venueID = :v")
+
+// ProjectionExpression is nil, so we receive all Item attributes in response
+params := &dynamodb.ScanInput{
+  ExpressionAttributeNames:  expressionAttributeNames,
+  ExpressionAttributeValues: expressionAttributeValues,
+  FilterExpression:          filterExpression,
+  ProjectionExpression:      projectionExpression,
+  TableName:                 aws.String(os.Getenv("TABLE_NAME")),
+}
+results, err := svc.Scan(params)
+if err != nil {
+  return Response{}, err
+}
+
+// Iterate results
+for _, i := range results.Items {
+  ...
+}
+                  </code>
+                </pre>
+                <h2>Filter by primary sort key and arbitrary attribute</h2>
+                <p>Now things are getting exciting. In this example <strong>venueID</strong> is stays the primary sort key, but we also use <strong>state</strong> in the expression, which is a keyword reserved by DynamoDb. See the extensive list of reserved keywords <a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html">here</a>.</p>
+                <pre>
+                  <code>
+// Declare ScanInput parameters
+// The ones without value will be nil, thus ignored by the request
+var expressionAttributeNames map[string]*string
+var expressionAttributeValues map[string]*dynamodb.AttributeValue
+var filterExpression *string
+var projectionExpression *string
+
+// Create a mapping which replaces "state" word with "#parking_state", so we don't use a reserved word in our expression
+expressionAttributeNames = map[string]*string{
+  "#parking_state": aws.String("state"),
+}
+
+// Create an attribute value mapping, so we are able to use :id in the filter expression
+expressionAttributeValues = map[string]*dynamodb.AttributeValue{
+  ":v": {
+        S: aws.String(*VenueID),
+  },
+  ":s": {
+        N: aws.String(*StateID),
+  },
+}
+
+// In the expression use "#parking_state" instead of "state"
+filterExpression = aws.String("#parking_state = :s AND venueID = :v")
+
+// ProjectionExpression is nil, so we receive all Item attributes in response
+params := &dynamodb.ScanInput{
+  ExpressionAttributeNames:  expressionAttributeNames,
+  ExpressionAttributeValues: expressionAttributeValues,
+  FilterExpression:          filterExpression,
+  ProjectionExpression:      projectionExpression,
+  TableName:                 aws.String(os.Getenv("TABLE_NAME")),
+}
+results, err := svc.Scan(params)
+if err != nil {
+  return Response{}, err
+}
+
+// Iterate results
+for _, i := range results.Items {
+  ...
+}
+                  </code>
+                </pre>
+                <p>
+                  I hope these snippets will help you write complex Filter Expressions using Go SDK.
+                </p>
+                <hr/>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
