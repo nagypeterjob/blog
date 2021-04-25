@@ -1,0 +1,285 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Handling logs on Ubuntu</title>
+  <meta name="description" content="A guide to come up with sane defaults for log handling on Ubuntu">
+  <meta name="author" content="Peter Nagy">
+  <meta name="roboots" content="index, archive, follow">
+  <meta name="googlebot" content="index, follow">
+
+  <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-67534623-1', 'auto');
+    ga('send', 'pageview');
+  </script>
+  <script async src='https://www.google-analytics.com/analytics.js'></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+  <link rel="stylesheet" href="../../../../css/main.css?v=1.0">
+  <link rel="icon" type="image/x-icon" href="../../../../icons/favicon.ico">
+  <link rel="apple-touch-icon" sizes="120x120" href="../../../../icons/apple-touch-icon-120x120.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="../../../../icons/apple-touch-icon-152x152.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="../../../../icons/apple-touch-icon-180x180.png" />
+</head>
+
+<body>
+    <div class="container-fluid underline head">
+      <div class="container header">
+        <div class="row">
+          <div class="col">
+            <div class="logo">
+              Peter is doing platform
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="disclaimer">
+              The opinions expressed on this blog are purely mine
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <ul>
+              <li><a href="../../../../">blog</a></li>
+              <li><a href="https://github.com/nagypeterjob">github</a></li>
+              <li><a href="https://twitter.com/ngy_ptr">twitter</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="container article">
+        <div class="row">
+            <div class="col post">
+              <h1>Handling logs on Ubuntu</h1>
+              <p>Logs can leave a big mess on Ubuntu (or on any OS for that matter) when left unattended. Let me show you how I tipically configure Ubuntu to avoid a possible disk fillup.</p> 
+
+              <h2>System log defaults</h2>
+              
+              <p>The below table shows my usual defaults when it comes to logrotate configuration. </p>
+              <table class="table table-bordered">
+                <thead>
+                  <tr>
+                    <th scope="col">File</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Default rotation frequency</th>
+                    <th scope="col">My suggestion</th>
+                    <th scope="col">Rollups to keep</th>
+                  </tr>
+                </thead>
+                <tbody> 
+                  <tr>
+                    <th scope="row">apt/*</th>
+                    <td>text</td>
+                    <td>monthly</td>
+                    <td>weekly</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">atop/*</th>
+                    <td>binary</td>
+                    <td>28 days</td>
+                    <td>daily</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">auth.log</th>
+                    <td>text</td>
+                    <td>weekly</td>
+                    <td>weekly</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">cloud-init.log, cloud-init-output.log</th>
+                    <td>text</td>
+                    <td>-</td>
+                    <td>can be deleted after 3 days</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">dpkg.log</th>
+                    <td>text</td>
+                    <td>monthly</td>
+                    <td>weekly</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">faillog</th>
+                    <td>binary</td>
+                    <td>weekly</td>
+                    <td>weekly</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">kern.log</th>
+                    <td>text</td>
+                    <td>weekly</td>
+                    <td>3 days</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">syslog.log</th>
+                    <td>text</td>
+                    <td>daily</td>
+                    <td>daily</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">wtmp</th>
+                    <td>binary</td>
+                    <td>monthly</td>
+                    <td>monthly</td>
+                    <td>3</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p>I generally set a 10M size limit on each logfile so when the size is reached, it rotates. Most of the time I am forwarding important (<strong>auth.log</strong>, <strong>faillog</strong>, etc...) logs to central log storage, hence I am quite brave with keeping only 1-3 rollups at once.</p>
+              <abbr>Be advised that rotating logs based on file size is not always the best idea!</abbr>
+
+              <h3>Rotating atop logs</h3>
+              <p>Rotating atop logs can get rather exotic. One way is to copy <strong>/usr/share/atop/atop.daily</strong> script to <strong>/etc/cron.daily/</strong> and modify this line:</p>
+              <pre>
+                <code>
+#Default rotate frequency is 28 days
+( (sleep 3; find $LOGPATH -name 'atop_*' -mtime +28 -exec rm {} \;)& )
+                </code>
+              </pre>
+            <p>Another way is to write <strong>logrotate</strong> config that is ugly because of the atop log file format (atop_YYYYMMDD), but I prefer it much more.</p>
+            <pre>
+              <code>
+# taken from https://unix.stackexchange.com/a/466709
+/var/log/atop/atop_20[0-9][0-9][0-9][0-9][0-9][0-9] {
+  missingok
+  daily
+  nodateext
+  rotate 5
+  ifempty
+  nocreate
+  postrotate
+    /usr/bin/find /var/log/atop/ -maxdepth 1 -mount -name atop_20\[0-9\]\[0-9\]\[0-9\]\[0-9\]\[0-9\]\[0-9\]\* -mtime +40 -exec /bin/rm {} \;
+  endscript
+}
+              </code>
+            </pre>
+
+              <h2>Syslog & journal</h2>
+              <p>Before anything else, create a <strong>/var/log/journal</strong> so that journal can persist logs between reboots.</p>
+
+              <p>On Ubuntu, both syslog & journal are enabled by default, and journal's <strong>ForwardToSyslog</srtong> set to <srtong>True</strong>. That can lead to plentiful "duplicated" logs, especially if numerous <strong>systemd</strong> services are running on the node with verbose logging properties. In case <strong>/var/log/syslog</strong> is flooded with systemd service logs, you can try a few things to keep syslog clean:
+              </p>
+              <p>
+                <div class="row list">
+                    <div class="col-1 num">1</div>
+                    <div class="col-11">set <strong>ForwardToSyslog=no</strong> in <strong>/etc/systemd/journald.conf</strong> and reload systemd (this is <strong>NOT</strong> a great idea)</div>
+                </div>
+                <div class="row list">
+                    <div class="col-1 num">2</div>
+                    <div class="col-11">You can prevent a service to forward logs to stdout/stderr by adding <strong>StandardOutput=null</strong> under the <strong>[Service]</strong> section of the service's systemd config file. You should <strong>ONLY</strong> do this if the service logs to an other location anyways.</div>
+                </div>
+            </p>
+            <p>I don't have a silver bullet when it comes to journal. Most of the time I keep the default settings and it just works. Occasionally, in case I need to rotate journal logs by hand, these commands come in handy:</p>
+            <pre>
+              <code>
+# put recent files from active to archive state
+journalctl --rotate
+
+# retain only the last 1 day
+journalctl --vacuum-time=1d
+# or
+# retain only the last 100M worth of logs
+journalctl --vacuum-size=100M
+              </code>
+            </pre>
+              <h2>Docker logs</h2>
+              <p>By default Docker does not perform <strong>ANY</strong> logrotation, so produced logs can eat up the disk space really fast. To come up with sane defaults, create the following file, then restart docker daemon:</p>
+              <pre>
+                  <code>
+#/etc/docker/daemon.json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+      "max-size": "10m",
+      "max-file": "5"
+  }
+}
+                  </code>
+              </pre>
+              <abbr>You can find container logs at /var/lib/docker/containers/*/*-json.log</abbr>
+              <h2>Forwarding logs</h2>
+              <p>I highly recommend you to forward the most important OS / service logs to a central storage for safe keeping. 9 out of 10 times I use the fluent family or Datadog agent (yes, this is a commerical product) for log forwarding because of their ease of use & the tons of plugins they operate with. An other good candidate is Filebeat. 
+              Of course using a "3rd-party" tool is not always an option, that is when <strong>rsyslog</strong> comes to the rescue. You can use the following template go get going:
+              <pre>
+                <code>             
+$ModLoad imfile
+$InputFileName "location of the logfiles"
+$InputFileTag "custom tags"
+$InputFileStateFile "stat-servicename"
+$InputFileSeverity "severity"
+$InputFileFacility local3
+$InputRunFileMonitor
+local3.* @@hostname:port
+                  </code> 
+              </pre>
+              <p>
+                To activate a config:
+                <div class="row list">
+                    <div class="col-1 num">1</div>
+                    <div class="col-11">Create a config file under <strong>/etc/rsyslog.d</strong></div>
+                </div>
+                <div class="row list">
+                    <div class="col-1 num">2</div>
+                    <div class="col-11">Restart rsyslog</div>
+                </div>
+              </p>
+              <h3>Log types to forward</h3>
+              <p>
+                <div class="row list">
+                  <div class="col-1 num">1</div>
+                  <div class="col-11">Audit logs (auth.log, faillog, wtmp, tallylog)</div>
+                </div>
+                <div class="row list">
+                    <div class="col-1 num">2</div>
+                    <div class="col-11">system/kernel stuff (syslog.log, kern.log)</div>
+                </div>
+                <div class="row list">
+                  <div class="col-1 num">3</div>
+                  <div class="col-11">custom application / container logs</div>
+              </div>
+             </p>
+              <h2>Extra measures</h2>
+              <h3>Reserved space</h3>
+              <p>
+                Sometimes, when the system disk gets full, opening a new ssh session becomes impossible. By utilizing that most fileystems reserve a small amount of space for the root account, the ssh access still can be maintained to the OS:
+                <div class="row list">
+                  <div class="col-1 num">1</div>
+                  <div class="col-11">Enable the root account on Ubuntu</div>
+                </div>
+                <div class="row list">
+                    <div class="col-1 num">2</div>
+                    <div class="col-11">Configure ssh daemon to allow root login</div>
+                </div>
+                <div class="row list">
+                  <div class="col-1 num">3</div>
+                  <div class="col-11">Disable password login for root, use cert</div>
+                </div>
+              </p>
+              <h3>Partitioning</h3>
+              <p>
+                I recommend storing the entire <strong>/var</strong> directory on a different disk or partition
+              </p>
+              <h3>Learning</h3>
+              <p>
+                Lastly, I suggest you to read <a href="https://www.amazon.com/UNIX-Linux-System-Administration-Handbook/dp/0134277554">UNIX and Linux System Administration Handbook</a> which is the definitive source for learning Linux.
+              </p>
+              <hr/>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
