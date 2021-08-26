@@ -162,6 +162,24 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py \
     && rm get-pip.py
                     </code>
                 </pre>
+                <h2>Update - 26th Aug 2021</h2>
+                <p>I have received an email which might come handy for some of you. The email is published without modification, I've only slightly changed the formatting</p>
+                <pre>
+                  <code>
+Your March 2021 post at prodisup.com was quite helpful. Thank you for this guidance.
+
+For now, I'm running Ubuntu 16.05 and it took two attempts to get the python 3.9 install working. Crucial was understanding that I really didn't want to follow this step: 
+- Remove the current python3.5.x version from your machine.
+This step is not necessary if there was no default python3 installed on your machine (or if removing it disables a lot of other things you depend on -s)
+# apt remove python3.5-minimal -y
+
+Removing python3.5 would brick the system by removing many utilities that depend on python (the -y OPTION adds insult to injury). Happily, my mistake was reversible: re-install python 3.5 and the dependent utilities using the apt log as a guide. No major harm--only an hour or two spent, plus a little time recovering from a panic attack. ;-)
+
+Finally, I didn't want to run the newest version of python 3 and pip everywhere in my system--only for the development user. So I put the python link to version 3.9 in /usr/local/bin and aliased that link in the development user's environment.
+
+Thanks again
+                  </code>
+                </pre>
                 <hr/>
             </div>
         </div>
