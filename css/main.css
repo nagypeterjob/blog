@@ -16,6 +16,11 @@ a img {
     padding: 1em;
 }
 
+img {
+    width: 100%;
+    padding: 1em;
+}
+
 /* HEADER */
 
 .underline {
@@ -130,6 +135,11 @@ a img {
     padding-left: 2em;
     padding-right: 1em;
     white-space: pre-wrap;
+}
+
+.post a img {
+    width: 100%;
+    padding: 1em;
 }
 
 .list {
