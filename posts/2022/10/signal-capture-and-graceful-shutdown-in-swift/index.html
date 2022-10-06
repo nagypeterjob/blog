@@ -1,0 +1,173 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Signal capture and graceful shutdown in Swift</title>
+  <meta name="description" content="how to handle graceful shutdowns in Swift">
+  <meta name="author" content="Peter Nagy">
+  <meta name="roboots" content="index, archive, follow">
+  <meta name="googlebot" content="index, follow">
+
+  <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-67534623-1', 'auto');
+    ga('send', 'pageview');
+  </script>
+  <script async src='https://www.google-analytics.com/analytics.js'></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+  <link rel="stylesheet" href="../../../../css/main.css?v=1.0">
+  <link rel="icon" type="image/x-icon" href="../../../../icons/favicon.ico">
+  <link rel="apple-touch-icon" sizes="120x120" href="../../../../icons/apple-touch-icon-120x120.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="../../../../icons/apple-touch-icon-152x152.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="../../../../icons/apple-touch-icon-180x180.png" />
+</head>
+
+<body>
+    <div class="container-fluid underline head">
+      <div class="container header">
+        <div class="row">
+          <div class="col">
+            <div class="logo">
+              You know, I'm something of a computer scientist myself
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="disclaimer">
+              The opinions expressed on this blog are purely mine
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <ul>
+              <li><a href="../../../../">blog</a></li>
+              <li><a href="https://github.com/nagypeterjob">github</a></li>
+              <li><a href="https://twitter.com/ngy_ptr">twitter</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="container article">
+        <div class="row">
+            <div class="col post">
+                <h1>Signal capture and graceful shutdown in Swift</h1>
+
+                <p>I am knee-deep in macOS systems programming lately, so I solved an interesting problem the other day: gracefully terminating a proper MacOS application on <strong>SIGINT</strong> signal.</p>
+                <blockquote class="blockquote">Based on <a href="https://dsa.cs.tsinghua.edu.cn/oj/static/unix_signal.html">this website</a>, <strong>SIGINT</strong> is: sent to a process by its controlling terminal when a user wishes to interrupt the process. This is typically initiated by pressing Ctrl-C, but on some systems, the "delete" character or "break" key can be used.</blockquote>
+
+                <p><strong>SIGTERM</strong> would have been a more natural choice, but it was already taken for something else. Anyways, they are almost identical in meaning.</p>
+                
+                <p>What I did, is the following:</p>
+
+                <pre>
+                    <code>
+// appDelegate.swift
+
+
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+  private var signal: DispatchSourceSignal?
+
+  let queue = DispatchQueue(label: "com.company.signalQueue")  // 1
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+      // Catch SIGINT signal and stop subprocess gracefully
+      self.signal = handleSigint {
+          NSApp.terminate(self) // 2
+      }
+
+      // Other stuff in applicationDidFinishLaunching...
+
+  }
+
+  // Gracefully stop subprocess before application termination
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+      if subprocessIsRunning() {
+          stopSubProcess()
+          return .terminateLater // 3
+      }
+      return .terminateNow // 4
+  }
+}
+
+extension AppDelegate {
+  // Catch and handle SIGINT
+  func handleSigint(handler: @escaping DispatchSourceProtocol.DispatchSourceHandler) -> DispatchSourceSignal {
+      Darwin.signal(SIGINT, SIG_IGN)
+      let signal = DispatchSource.makeSignalSource(signal: SIGINT, queue: self.queue)
+
+      signal.setEventHandler(handler: handler)
+      signal.resume()
+      return signal
+  }
+}
+                    </code>
+                </pre>
+
+                <div class="row list">
+                  <div class="col-1 num">1</div>
+                  <div class="col-11">
+                    Setting up a "custom" DispatchQueue, so the app doesn't listen for signals on the main queue
+                  </div>
+                </div>
+                <div class="row list">
+                    <div class="col-1 num">2</div>
+                    <div class="col-11">When <strong>SIGINT</strong> was captured, the handler calls <strong>NSApp.<a href="https://developer.apple.com/documentation/appkit/nsapplication/1428417-terminate">terminate(self)</a></strong> to initiate the termination process. </div>
+                </div>
+                <div class="row list">
+                    <div class="col-1 num">3</div>
+                    <div class="col-11">The previous <strong>terminate(_:)</strong> call has invoked <strong>applicationShouldTerminate(_:)</strong>, where the application can control whether it is ready to terminate or not. In my example, the code checks if a certain subprocess is running: If it does, the app tries to stop the subprocess and returns a <strong>.terminateLater</strong> reply. (signaling that the app is not ready yet to exit). Now it is <strong>stopSubProcess()</strong>'s responsibility to signal whether it is safe to exit the application.</div>
+                </div>
+                <div class="row list">
+                  <div class="col-1 num">4</div>
+                  <div class="col-11">If the subprocess is not running, <strong>applicationShouldTerminate(_:)</strong> returns a <strong>.terminateNow</strong> reply. (signaling that the application can safely stop)</div>
+                </div>
+
+                <pre>
+                  <code>
+// subprocess.swift
+
+...
+
+func stopSubProcess() {
+  DispatchQueue.main.async {
+      self.stop { result in
+          defer {
+              NSApp.reply(toApplicationShouldTerminate: true) // 5
+          }
+          if let error = result {
+              // handle error
+          } else {
+             // success
+          }
+      }
+  }
+}
+
+...
+
+                  </code>
+                </pre>
+                <div class="row list">
+                  <div class="col-1 num">5</div>
+                  <div class="col-11">When the completion handle finishes, it invokes <strong>NSApp.reply(toApplicationShouldTerminate: true)</strong> to signal the termination process that it can safely exit the application. </div>
+                </div>
+                <div class="row list">
+                  <div class="col-1 num">*</div>
+                  <div class="col-11">The examples were built on Ventura beta 10 | xcode 14.1 Beta 3 | Swift 5.7</div>
+                </div>
+                <br/>
+                <br/>
+                <p>That's all folks, see you later!</p>
+                <hr/>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
