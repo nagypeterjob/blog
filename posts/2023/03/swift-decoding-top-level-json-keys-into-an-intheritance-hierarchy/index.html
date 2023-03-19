@@ -1,0 +1,246 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Swift: decoding top-level JSON keys into an intheritance hierarchy</title>
+  <meta name="description" content="Swift: An introduction on how to decode different top-level JSON keys into classes in inheritance hierarchy.">
+  <meta name="author" content="Peter Nagy">
+  <meta name="roboots" content="index, archive, follow">
+  <meta name="googlebot" content="index, follow">
+
+  <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-67534623-1', 'auto');
+    ga('send', 'pageview');
+  </script>
+  <script async src='https://www.google-analytics.com/analytics.js'></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+  <link rel="stylesheet" href="../../../../css/main.css?v=1.0">
+  <link rel="icon" type="image/x-icon" href="../../../../icons/favicon.ico">
+  <link rel="apple-touch-icon" sizes="120x120" href="../../../../icons/apple-touch-icon-120x120.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="../../../../icons/apple-touch-icon-152x152.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="../../../../icons/apple-touch-icon-180x180.png" />
+</head>
+
+<body>
+    <div class="container-fluid underline head">
+      <div class="container header">
+        <div class="row">
+          <div class="col">
+            <div class="logo">
+              You know, I'm something of a computer scientist myself
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="disclaimer">
+              The opinions expressed on this blog are mine alone
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <ul>
+              <li><a href="../../../../">blog</a></li>
+              <li><a href="https://github.com/nagypeterjob">github</a></li>
+              <li><a href="https://twitter.com/ngy_ptr">twitter</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="container article">
+        <div class="row">
+            <div class="col post">
+                <h1>Swift: decoding top-level JSON keys into an intheritance hierarchy</h1>
+                <p class="date">2023-03-19</p>
+                <p>
+                  Let say we have JSON data, where the different top level objects can share keys. In fact, these top level objects could be described with Object Oriented paradigms.
+                </p>
+                <pre>
+                  <code>
+{
+  "model_s": {
+    "price": 89990
+  },
+  "plaid": {
+    "price": 109990,
+    "range": 396
+  }
+}
+                  </code>
+                </pre>
+                <p>
+                  Now, we would like to decode this JSON structure into classes, by writing resuable code and without abusing Swift too much. Let's define the base class:
+                </p>
+                  <pre>
+                    <code>
+class ModelS: Codable {
+
+    var price: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case price
+    }
+}
+                    </code>
+                  </pre>
+                <p>
+                  So far so good. For the base class, we can get away with this minimal setup, as the compiler will do the heavy lifting. Now let's see the subclass:
+                </p>
+                <pre>
+                  <code>
+class Plaid: ModelS {
+
+    var range: Int
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.range = try container.decode(Int.self, forKey: .range)
+
+        try super.init(from: decoder)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case range
+    }
+}
+                  </code>
+                </pre>
+                <p>
+                  As you can see, we needed to implement <strong>required init(from:)</strong> for the subclass. This way we tell the compiler what to do with the <strong>range</strong> variable, and we also call <strong>super.init(from:)</strong> respectively. In case we did not implement this function, we would have to assign a default value for the <strong>range</strong> variable. During decoding, the compiler would just fill <strong>range</strong> with the default value.
+                </p>
+                <p>
+                  In order to be able to decode the top level JSON objects into the right hierarchy, let's create a "wrapper" class:
+                </p>
+                <pre>
+                  <code>
+class Garage: Codable {
+
+    var models: ModelS
+
+    var plaid: Plaid
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.models = try ModelS(from: container.superDecoder(forKey: .models))
+        self.plaid = try Plaid(from: container.superDecoder(forKey: .plaid))
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case models = "model_s", plaid
+    }
+}
+                  </code>
+                </pre>
+                <p>
+                  Please note how the constructors get passed a <strong>superDecoder</strong>, for which we define the desired top-level keys.
+                  Now let's see the acutal decoding part:
+                </p>
+                <pre>
+                  <code>
+let JSON = """
+{
+  "model_s": {
+    "price": 89990
+  },
+  "plaid": {
+    "price": 109990,
+    "range": 396
+  }
+}
+"""
+
+let jsonData = JSON.data(using: .utf8)!
+let garage = try! JSONDecoder().decode(Garage.self, from: jsonData)
+print("Model S price: \(garage.models.price)")
+print("Model S Plaid price: \(garage.plaid.price) range: \(garage.plaid.range)")
+                  </code>
+                </pre> 
+                <p>
+                  Running the above code shows that we can declare success:
+                </p>
+                <code>
+                  <pre>
+Swift version 5.7.3 (swift-5.7.3-RELEASE)                                     23:56:09 17s
+Target: x86_64
+Model S price: 89990
+Model S Plaid price: 109990 range: 396
+                  </pre>
+                </code>
+                <hr/>
+                <h2>The whole code:</h2>
+                <pre>
+                  <code>
+import Foundation
+
+class Garage: Codable {
+
+    var models: ModelS
+
+    var plaid: Plaid
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.models = try ModelS(from: container.superDecoder(forKey: .models))
+        self.plaid = try Plaid(from: container.superDecoder(forKey: .plaid))
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case models = "model_s", plaid
+    }
+}
+
+class ModelS: Codable {
+    
+    var price: Int
+
+    private enum CodingKeys: String, CodingKey {
+      case price
+    }
+}
+
+class Plaid: ModelS {
+   
+    var range: Int
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.range = try container.decode(Int.self, forKey: .range)
+
+        try super.init(from: decoder)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+      case range
+    }
+}
+
+let JSON = """
+{
+  "model_s": {
+    "price": 89990
+  },
+  "plaid": {
+    "price": 109990,
+    "range": 396
+  }
+}
+"""
+
+let jsonData = JSON.data(using: .utf8)!
+let garage = try! JSONDecoder().decode(Garage.self, from: jsonData)
+print("Model S price: \(garage.models.price)")
+print("Model S Plaid price: \(garage.plaid.price) range: \(garage.plaid.range)")
+                  </code>
+                </pre>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
