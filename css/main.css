@@ -3,6 +3,13 @@
     padding-left: 10px;
 }
 
+.ad {
+    margin-top: 1.4em;
+    font-family: monospace;
+    font-size: 0.8em;
+    padding: 0 1em;
+}
+
 p {
     font-size: 1.2em;
 }
